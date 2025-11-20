@@ -710,7 +710,14 @@ https://yourstore.com/static/version123456789/frontend/Hyva/default/en_US/css/st
 
 ### Overview
 
-Hyvä uses **Alpine.js v3** as a lightweight JavaScript framework for reactive UI components. Alpine.js is loaded from CDN or bundled, with plugins for extended functionality.
+Hyvä v1.4.1 uses **Alpine.js v3** as a lightweight JavaScript framework for reactive UI components. Alpine.js is loaded via local bundled files (not CDN), with a plugin architecture that extends functionality.
+
+**Key Features:**
+- **Alpine.js v3.x** - Modern reactive framework
+- **Deferred Loading** - x-defer attribute for performance
+- **Plugin System** - Intersect, Defer, HTMLDialog, Snap Slider, Ignore
+- **Event-Driven** - Uses `alpine:init` and `alpine:initialized` events
+- **CSP Compatible** - Works with Content Security Policy
 
 ---
 
@@ -718,42 +725,89 @@ Hyvä uses **Alpine.js v3** as a lightweight JavaScript framework for reactive U
 
 ```
 vendor/hyva-themes/magento2-theme-module/src/
-└── view/frontend/
-    ├── layout/
-    │   └── default_hyva.xml                              # Alpine.js layout configuration
-    └── templates/
-        └── page/
-            └── js/
-                ├── alpinejs.phtml                        # Main Alpine.js loader
-                ├── plugins/
-                │   ├── snap-slider.phtml                 # Snap slider plugin
-                │   ├── htmldialog.phtml                  # Dialog plugin
-                │   ├── intersect.phtml                   # Intersect plugin
-                │   ├── ignore.phtml                      # Ignore plugin
-                │   └── defer.phtml                       # Defer plugin
-                ├── alpine-defer-rules.phtml              # Defer configuration
-                ├── cookies.phtml                         # Cookie handling
-                ├── private-content.phtml                 # Private content
-                └── variables.phtml                       # JavaScript variables
+├── view/
+│   ├── base/                                              # Base (frontend + adminhtml)
+│   │   ├── templates/page/js/
+│   │   │   ├── alpinejs.phtml                            # Main Alpine.js loader
+│   │   │   ├── alpine-defer-rules.phtml                  # Defer configuration
+│   │   │   └── plugins/
+│   │   │       ├── v3/                                   # Alpine v3 plugins
+│   │   │       │   ├── intersect.phtml                   # Intersection Observer
+│   │   │       │   ├── defer.phtml                       # Deferred loading
+│   │   │       │   ├── htmldialog.phtml                  # Dialog support
+│   │   │       │   └── snap-slider.phtml                 # Carousel/slider
+│   │   │       ├── v2/                                   # Alpine v2 plugins (legacy)
+│   │   │       │   └── ...
+│   │   │       ├── ignore.phtml                          # Plugin loader wrapper
+│   │   │       ├── intersect.phtml                       # Plugin loader wrapper
+│   │   │       ├── defer.phtml                           # Plugin loader wrapper
+│   │   │       └── snap-slider.phtml                     # Plugin loader wrapper
+│   │   └── web/js/
+│   │       ├── alpine3.min.js                            # Alpine.js v3 core (minified)
+│   │       ├── alpine3.js                                # Alpine.js v3 core
+│   │       ├── alpine3-csp.min.js                        # CSP version
+│   │       └── alpine.min.js                             # Alpine v2 (legacy)
+│   │
+│   └── frontend/                                         # Frontend-specific
+│       ├── layout/
+│       │   └── default_hyva.xml                          # Alpine.js layout config
+│       └── templates/page/js/
+│           ├── hyva.phtml                                # Hyva utility functions
+│           ├── variables.phtml                           # Global JS variables
+│           ├── cookies.phtml                             # Cookie management
+│           ├── private-content.phtml                     # Customer sections
+│           └── require-min-alpine-version.phtml          # Version check
+
+vendor/hyva-themes/magento2-default-theme/
+└── Magento_Theme/layout/
+    └── default.xml                                       # Loads default_hyva handle
 ```
 
 ---
 
-### Step 1: Understanding default_hyva.xml (Alpine.js Loading)
+### Step 1: Understanding Layout XML Flow
+
+#### Entry Point: default.xml
+
+**Location:** `vendor/hyva-themes/magento2-default-theme/Magento_Theme/layout/default.xml:10`
+
+```xml
+<?xml version="1.0"?>
+<page>
+    <update handle="default_hyva"/>  <!-- ← Triggers Alpine.js loading -->
+    <body>
+        <!-- Page structure -->
+    </body>
+</page>
+```
+
+**Purpose:** Every page in Hyvä includes the `default_hyva` handle, which sets up Alpine.js infrastructure.
+
+---
+
+#### Core Layout: default_hyva.xml
 
 **Location:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/layout/default_hyva.xml`
+
+**Key Sections:**
 
 ```xml
 <?xml version="1.0"?>
 <page>
     <body>
-        <!-- Alpine.js loaded before </body> for non-blocking load -->
+        <!-- 1. HEAD SECTION: Global variables and Hyva utilities -->
+        <referenceContainer name="head.additional">
+            <block name="head.js" template="Hyva_Theme::page/js/variables.phtml"/>
+            <block name="head.hyva-scripts" template="Hyva_Theme::page/js/hyva.phtml"/>
+        </referenceContainer>
+
+        <!-- 2. BEFORE BODY END: Alpine.js and plugins -->
         <referenceContainer name="before.body.end">
 
-            <!-- Main Alpine.js block -->
+            <!-- Main Alpine.js block with child plugin blocks -->
             <block name="script-alpine-js" template="Hyva_Theme::page/js/alpinejs.phtml">
 
-                <!-- Plugins (loaded BEFORE Alpine.js initializes) -->
+                <!-- Child blocks = Alpine.js plugins -->
                 <block name="alpine-plugin-snap-slider"
                        template="Hyva_Theme::page/js/plugins/snap-slider.phtml"/>
 
@@ -768,120 +822,421 @@ vendor/hyva-themes/magento2-theme-module/src/
 
                 <block name="alpine-plugin-defer"
                        template="Hyva_Theme::page/js/plugins/defer.phtml">
-
-                    <!-- Defer rules configuration -->
                     <block name="alpine-defer-rules"
                            template="Hyva_Theme::page/js/alpine-defer-rules.phtml"/>
                 </block>
             </block>
 
-            <!-- Utility scripts -->
+            <!-- Supporting scripts -->
             <block name="script-cookies" template="Hyva_Theme::page/js/cookies.phtml"/>
             <block name="script-private-content" template="Hyva_Theme::page/js/private-content.phtml"/>
-
+            <block name="require-alpine-v3" template="Hyva_Theme::page/js/require-min-alpine-version.phtml"/>
         </referenceContainer>
     </body>
 </page>
 ```
 
 **Why before.body.end?**
-- Non-blocking: HTML renders first, then JavaScript loads
-- DOM is ready when scripts execute
-- Optimal performance
+- ✅ **Non-blocking:** HTML content renders first
+- ✅ **DOM ready:** All elements exist when scripts execute
+- ✅ **Performance:** Deferred loading with `defer` attribute
+- ✅ **Plugin order:** Plugins register before Alpine.js initializes
 
 ---
 
-### Step 2: Understanding alpinejs.phtml
+### Step 2: Complete Alpine.js Loading Sequence
 
-**Location:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/templates/page/js/alpinejs.phtml`
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ PHASE 1: HEAD SECTION (Loads First)                             │
+└──────────────────────────────────────────────────────────────────┘
 
-**Purpose:** Main Alpine.js loader template
+STEP 1: Global Variables Setup
+        File: vendor/hyva-themes/magento2-theme-module/src/view/frontend/
+              templates/page/js/variables.phtml
 
-**Content (simplified):**
+        <script>
+            var BASE_URL = '/';
+            var COOKIE_CONFIG = { ... };
+            var CURRENT_STORE_CODE = 'default';
+            window.hyva = window.hyva || {}
+        </script>
+
+STEP 2: Hyva Utility Functions
+        File: vendor/hyva-themes/magento2-theme-module/src/view/frontend/
+              templates/page/js/hyva.phtml
+
+        Functions created:
+        - hyva.getCookie() / hyva.setCookie()
+        - hyva.getFormKey()
+        - hyva.formatPrice()
+        - hyva.str() / hyva.strf()
+        - hyva.replaceDomElement()
+        - hyva.trapFocus() / hyva.releaseFocus()
+        - hyva.alpineInitialized(callback) ← Listens for 'alpine:initialized'
+
+┌──────────────────────────────────────────────────────────────────┐
+│ PHASE 2: BEFORE BODY END (Loads Last)                           │
+└──────────────────────────────────────────────────────────────────┘
+
+STEP 3: Plugin Registration Scripts (Execute First)
+
+        3a. Snap Slider Plugin
+            File: .../templates/page/js/plugins/snap-slider.phtml
+            → Delegates to: .../plugins/v3/snap-slider.phtml
+
+            Registers: Carousel/slider functionality
+            Listens: alpine:init event
+
+        3b. HTML Dialog Plugin
+            File: .../templates/page/js/plugins/htmldialog.phtml
+            → Delegates to: .../plugins/v3/htmldialog.phtml
+
+            Registers: Native <dialog> support
+            Listens: alpine:init event
+
+        3c. Intersect Plugin
+            File: .../templates/page/js/plugins/intersect.phtml
+            → Delegates to: .../plugins/v3/intersect.phtml
+
+            <script>
+                document.addEventListener("alpine:init", () => {
+                    window.Alpine.plugin(src_default);  // Registers x-intersect
+                });
+            </script>
+
+            Provides: x-intersect directive
+
+        3d. Ignore Plugin
+            File: .../templates/page/js/plugins/ignore.phtml
+
+            Provides: x-ignore directive support
+
+        3e. Defer Plugin
+            File: .../templates/page/js/plugins/defer.phtml
+            → Delegates to: .../plugins/v3/defer.phtml
+
+            <script>
+                // Initializes deferred component loading
+                window.addEventListener('alpine:init', initDeferredComponents);
+
+                // Supports:
+                // x-defer="interact"  - Load on user interaction
+                // x-defer="intersect" - Load when visible
+                // x-defer="idle"      - Load on browser idle (4000ms)
+                // x-defer="eager"     - Load immediately
+                // x-defer="event:foo" - Load on custom event
+            </script>
+
+            Child: alpine-defer-rules.phtml (custom defer rules)
+
+STEP 4: Alpine.js Core Loading
+        File: vendor/hyva-themes/magento2-theme-module/src/view/base/
+              templates/page/js/alpinejs.phtml
+
+        <?php
+        $version = $viewModels->require(ThemeLibrariesConfig::class)
+                              ->getVersionIdFor('alpine'); // Returns "3"
+        ?>
+
+        <?= $block->getChildHtml() ?>  <!-- Renders all plugin blocks -->
+
+        <script type="module"
+                src="Hyva_Theme::js/alpine3.min.js"
+                defer
+                crossorigin
+        ></script>
+
+        Actual file: vendor/hyva-themes/magento2-theme-module/src/view/base/
+                     web/js/alpine3.min.js
+
+        What happens:
+        1. Alpine.js downloads (or loads from cache)
+        2. Dispatches 'alpine:init' event → Plugins receive
+        3. Plugins attach to Alpine via Alpine.plugin()
+        4. Alpine scans DOM for [x-data] components
+        5. Initializes all components
+        6. Dispatches 'alpine:initialized' event
+
+STEP 5: Deferred Component Handling
+
+        When Alpine initializes:
+        - Defer plugin scans for [x-defer] attributes
+        - Marks components with x-ignore (pauses initialization)
+        - Waits for trigger condition:
+
+          x-defer="interact" → Wait for user interaction (touch/mouse/key)
+          x-defer="intersect" → Wait for element to enter viewport
+          x-defer="idle" → Wait for browser idle (requestIdleCallback)
+          x-defer="eager" → Initialize immediately
+
+        - When triggered, calls: Alpine.initTree(element)
+
+STEP 6: Supporting Scripts
+
+        6a. Cookie Management
+            File: templates/page/js/cookies.phtml
+            Purpose: Cookie consent handling
+
+        6b. Private Content (Customer Sections)
+            File: templates/page/js/private-content.phtml
+            Purpose: Load customer-specific data via AJAX
+
+        6c. Alpine Version Check
+            File: templates/page/js/require-min-alpine-version.phtml
+            Purpose: Validates Alpine v3 is loaded
+
+┌──────────────────────────────────────────────────────────────────┐
+│ PHASE 3: USER INTERACTION (Runtime)                             │
+└──────────────────────────────────────────────────────────────────┘
+
+STEP 7: Page Fully Interactive
+        - Alpine components are reactive
+        - User interactions trigger Alpine updates
+        - Deferred components initialize on demand
+        - Customer sections load (cart, wishlist, etc.)
+```
+
+---
+
+### Step 3: Understanding Alpine.js Core Loader
+
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/base/templates/page/js/alpinejs.phtml`
 
 ```php
 <?php
-/**
- * Alpine.js Main Loader
- * Loads Alpine.js core and initializes plugins
- */
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ThemeLibrariesConfig;
+
+/** @var ViewModelRegistry $viewModels */
+
+// Determine Alpine version (2 or 3)
+$version = $viewModels->require(ThemeLibrariesConfig::class)
+                      ->getVersionIdFor('alpine') ?? 2;
 ?>
-<script>
-    /**
-     * Alpine.js Plugin Registration
-     * Plugins must be registered BEFORE Alpine.start()
-     */
-    window.Alpine = window.Alpine || {};
 
-    // Plugin initialization placeholder
-    window.Alpine.plugins = window.Alpine.plugins || [];
+<?= $block->getChildHtml() ?>  <!-- Renders plugin blocks first -->
 
-    <?= /* @noEscape */ $block->getChildHtml() ?>
-    // Child blocks render plugin code here
-
-</script>
-
-<!-- Load Alpine.js Core -->
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-<!-- OR load from local file -->
-<!-- <script defer src="<?= $escaper->escapeUrl($block->getViewFileUrl('Hyva_Theme::js/alpine.min.js')) ?>"></script> -->
+<script type="module"
+        src="<?= $escaper->escapeUrl($block->getViewFileUrl("Hyva_Theme::js/alpine{$version}.min.js")) ?>"
+        defer
+        crossorigin
+></script>
 ```
 
-**Load Order:**
-1. Plugin definitions (child blocks)
-2. Alpine.js core library
-3. Alpine automatically starts
+**Key Points:**
+- **Version Detection:** Reads from `etc/hyva-libraries.json` to determine Alpine version
+- **Module Type:** Uses `type="module"` for ES6 modules
+- **Defer:** Doesn't block page rendering
+- **Crossorigin:** Enables better error logging
+- **Child Blocks:** Plugins render before the `<script>` tag (DOM order)
 
 ---
 
-### Step 3: Understanding Alpine.js Plugins
+### Step 4: Understanding Alpine.js Plugins
 
-#### Plugin: Intersect
+#### Plugin Architecture
 
-**File:** `plugins/intersect.phtml`
+All plugins follow this wrapper pattern:
 
-**Purpose:** Trigger actions when elements enter viewport (lazy loading, animations)
+**Wrapper Template:** `plugins/intersect.phtml`
 
-**Usage:**
+```php
+<?php
+use Hyva\Theme\ViewModel\ThemeLibrariesConfig;
+
+$version = $viewModels->require(ThemeLibrariesConfig::class)
+                      ->getVersionIdFor('alpine') ?: '2';
+
+if (substr($version, -4) === '-csp') {
+    $version = substr($version, 0, -4);
+}
+?>
+<?= $block->fetchView($block->getTemplateFile(sprintf('Hyva_Theme::page/js/plugins/v%s/intersect.phtml', $version))) ?>
+```
+
+**Purpose:** Dynamically loads correct plugin version (v2 or v3).
+
+---
+
+#### Plugin: Intersect (Intersection Observer)
+
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/base/templates/page/js/plugins/v3/intersect.phtml`
+
+**Purpose:** Triggers actions when elements enter/leave viewport
+
+**Implementation:**
+
+```javascript
+<script>
+    document.addEventListener("alpine:init", () => {
+        window.Alpine.plugin(function(Alpine) {
+            Alpine.directive("intersect", Alpine.skipDuringClone(
+                (el, { value, expression, modifiers }, { evaluateLater, cleanup }) => {
+                    let evaluate = evaluateLater(expression);
+                    let options = {
+                        rootMargin: getRootMargin(modifiers),
+                        threshold: getThreshold(modifiers)
+                    };
+                    let observer = new IntersectionObserver((entries) => {
+                        entries.forEach((entry) => {
+                            if (entry.isIntersecting === (value === "leave")) return;
+                            evaluate();
+                            modifiers.includes("once") && observer.disconnect();
+                        });
+                    }, options);
+                    observer.observe(el);
+                    cleanup(() => observer.disconnect());
+                }
+            ));
+        });
+    });
+</script>
+```
+
+**Usage Examples:**
+
 ```html
+<!-- Trigger when element enters viewport -->
 <div x-data="{ show: false }"
      x-intersect="show = true">
     <div x-show="show" x-transition>
         Appears when scrolled into view
     </div>
 </div>
+
+<!-- With modifiers -->
+<div x-intersect.once="loadImages()">          <!-- Fire once only -->
+<div x-intersect.half="onHalfVisible()">       <!-- 50% visible threshold -->
+<div x-intersect.full="onFullyVisible()">      <!-- 100% visible -->
+<div x-intersect.margin.500px="trigger()">     <!-- 500px margin -->
 ```
 
-#### Plugin: Defer
+---
 
-**File:** `plugins/defer.phtml`
+#### Plugin: Defer (Deferred Component Loading)
 
-**Purpose:** Delay Alpine.js component initialization until needed (performance optimization)
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/base/templates/page/js/plugins/v3/defer.phtml`
 
-**Usage:**
+**Purpose:** Delays Alpine component initialization for performance optimization
+
+**Implementation:**
+
+```javascript
+<script>
+    (function () {
+        const hasAlpine = new Promise(resolve => {
+            window.addEventListener('alpine:initialized', resolve, {once: true});
+        });
+
+        const hasInteract = new Promise(resolve => {
+            ['touchstart', 'mouseover', 'wheel', 'scroll', 'keydown']
+                .forEach(type => window.addEventListener(type, resolve, {once: true}))
+        });
+
+        const onIntersect = (el) => {
+            return new Promise(resolve => {
+                const observer = new IntersectionObserver(entries => {
+                    if (entries[0].isIntersecting) {
+                        observer.disconnect();
+                        resolve();
+                    }
+                });
+                observer.observe(el);
+            });
+        }
+
+        function runComponent(el) {
+            hasAlpine.then(() => {
+                el.removeAttribute('x-ignore');
+                queueMicrotask(() => Alpine.initTree(el));
+            });
+        }
+
+        function initDeferredComponents() {
+            document.querySelectorAll('[x-data][x-defer]').forEach(el => {
+                el.setAttribute('x-ignore', '');  // Pause initialization
+                const deferUntil = el.getAttribute('x-defer').trim();
+
+                switch (deferUntil) {
+                    case 'interact':
+                        hasInteract.then(() => runComponent(el));
+                        break;
+                    case 'intersect':
+                        onIntersect(el).then(() => runComponent(el))
+                        break;
+                    case 'idle':
+                        window.requestIdleCallback
+                            ? requestIdleCallback(() => runComponent(el), {timeout: 4000})
+                            : setTimeout(() => runComponent(el), 4000);
+                        break;
+                    case 'eager':
+                        runComponent(el);
+                        break;
+                    default:
+                        if (deferUntil.startsWith('event:')) {
+                            window.addEventListener(
+                                deferUntil.substring(6),
+                                () => runComponent(el),
+                                {once: true}
+                            );
+                        }
+                }
+            });
+        }
+
+        window.addEventListener('alpine:init', initDeferredComponents, {once: true});
+    })()
+</script>
+```
+
+**Usage Examples:**
+
 ```html
-<!-- Load component when it enters viewport -->
-<div x-data="expensiveComponent()" x-defer="intersect">
-    <!-- Heavy component -->
+<!-- Defer until element enters viewport (lazy loading) -->
+<div x-data="productSlider()" x-defer="intersect">
+    <!-- Heavy image slider -->
 </div>
 
-<!-- Load component on user interaction -->
-<div x-data="slideshow()" x-defer="click">
-    <!-- Slideshow -->
+<!-- Defer until user interaction (click, scroll, touch) -->
+<div x-data="reviewsComponent()" x-defer="interact">
+    <!-- Reviews tab -->
+</div>
+
+<!-- Defer until browser is idle -->
+<div x-data="analyticsWidget()" x-defer="idle">
+    <!-- Non-critical analytics -->
+</div>
+
+<!-- Defer until custom event -->
+<div x-data="cart()" x-defer="event:cart-updated">
+    <!-- Mini cart -->
+</div>
+
+<!-- Load immediately (same as no defer) -->
+<div x-data="header()" x-defer="eager">
+    <!-- Header component -->
 </div>
 ```
 
-#### Plugin: HTMLDialog
+**Configuration:**
+- Idle timeout: `hyva_theme_general/alpine_defer/defer_idle_timeout` (default: 4000ms)
 
-**File:** `plugins/htmldialog.phtml`
+---
 
-**Purpose:** Native HTML `<dialog>` element support
+#### Plugin: HTMLDialog (Native Dialog Support)
+
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/base/templates/page/js/plugins/v3/htmldialog.phtml`
+
+**Purpose:** Provides Alpine.js integration with native HTML `<dialog>` element
 
 **Usage:**
+
 ```html
 <dialog x-data="{ open: false }"
-        x-dialog="open">
+        :open="open"
+        @click.outside="open = false">
+    <h2>Dialog Title</h2>
     <p>Dialog content</p>
     <button @click="open = false">Close</button>
 </dialog>
@@ -889,98 +1244,228 @@ vendor/hyva-themes/magento2-theme-module/src/
 <button @click="open = true">Open Dialog</button>
 ```
 
-#### Plugin: Snap Slider
+---
 
-**File:** `plugins/snap-slider.phtml`
+#### Plugin: Snap Slider (Carousel/Slider)
 
-**Purpose:** Touch-friendly product sliders with snap scrolling
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/base/templates/page/js/plugins/v3/snap-slider.phtml`
+
+**Purpose:** Touch-friendly product carousels with CSS scroll-snap
 
 **Usage:**
+
 ```html
 <div x-data="hyva.snapSlider()"
-     x-snap-slider>
-    <div x-snap-slider-item>Slide 1</div>
-    <div x-snap-slider-item>Slide 2</div>
-    <div x-snap-slider-item>Slide 3</div>
+     x-snap-slider
+     class="flex overflow-x-auto snap-x">
+    <div x-snap-slider-item class="snap-start">Slide 1</div>
+    <div x-snap-slider-item class="snap-start">Slide 2</div>
+    <div x-snap-slider-item class="snap-start">Slide 3</div>
 </div>
 ```
 
 ---
 
-### Step 4: Alpine.js Loading Flow
+### Step 5: Global Variables and Hyva Utilities
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. HTML Renders                                             │
-│    - Page DOM is built                                      │
-│    - Alpine directives (x-data, x-show) in HTML             │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Load Plugins (from child blocks)                         │
-│    - window.Alpine.plugin() calls                           │
-│    - Register BEFORE Alpine.start()                         │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Load Alpine.js Core (alpine.min.js)                      │
-│    - Download from CDN or local                             │
-│    - Initialize Alpine                                      │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Alpine.start() (automatic)                               │
-│    - Scan DOM for x-data components                         │
-│    - Initialize reactive data                               │
-│    - Bind event listeners                                   │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 5. Components Active                                        │
-│    - Alpine directives work                                 │
-│    - User interactions trigger updates                      │
-└─────────────────────────────────────────────────────────────┘
-```
+#### variables.phtml
 
----
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/templates/page/js/variables.phtml`
 
-### Step 5: JavaScript Variables (Magento Data)
+**Purpose:** Exposes PHP/Magento data to JavaScript
 
-**File:** `page/js/variables.phtml`
-
-**Purpose:** Pass PHP/Magento data to JavaScript
-
-**Example:**
 ```php
 <script>
-    window.hyva = window.hyva || {};
-
-    hyva.config = {
-        baseUrl: '<?= $escaper->escapeJs($block->getBaseUrl()) ?>',
-        storeCode: '<?= $escaper->escapeJs($block->getStoreCode()) ?>',
-        currency: '<?= $escaper->escapeJs($block->getCurrentCurrencyCode()) ?>',
-        priceFormat: <?= /* @noEscape */ $block->getPriceFormatJson() ?>,
-        customer: {
-            loggedIn: <?= $block->isCustomerLoggedIn() ? 'true' : 'false' ?>
-        }
+    var BASE_URL = '<?= /* @noEscape */ $block->getUrl('/') ?>';
+    var THEME_PATH = '<?= /* @noEscape */ $block->getViewFileUrl('/') ?>';
+    var COOKIE_CONFIG = {
+        "path": "/",
+        "domain": ".example.com",
+        "secure": true,
+        "lifetime": "3600",
+        "cookie_restriction_enabled": false
     };
+    var CURRENT_STORE_CODE = 'default';
+    var CURRENT_WEBSITE_ID = '1';
+
+    window.hyva = window.hyva || {}
+    window.cookie_consent_groups = window.cookie_consent_groups || {}
 </script>
 ```
 
-**Access in Alpine.js:**
+---
+
+#### hyva.phtml
+
+**File:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/templates/page/js/hyva.phtml`
+
+**Purpose:** Core Hyva utility functions
+
+**Key Functions:**
+
+```javascript
+// Cookie management
+hyva.getCookie(name)
+hyva.setCookie(name, value, days)
+hyva.setSessionCookie(name, value)
+
+// Form handling
+hyva.getFormKey()
+hyva.postForm({ action: '/cart/add', data: { product: 123 } })
+
+// Price formatting
+hyva.formatPrice(29.99, showSign = false, options = {})
+
+// String formatting (like PHP sprintf)
+hyva.str('%1 items in %2', 3, 'cart')  // "3 items in cart"
+hyva.strf('%0 items', 5)               // "5 items"
+
+// DOM manipulation
+hyva.replaceDomElement(selector, htmlContent)
+
+// Focus management
+hyva.trapFocus(element)
+hyva.releaseFocus(element)
+
+// Alpine.js helpers
+hyva.alpineInitialized(callback)  // Runs when Alpine is ready
+hyva.createBooleanObject('visible', false)  // Toggle helper
+
+// Number parsing
+hyva.safeParseNumber('123.45')  // For x-model.number alternative
+```
+
+**Alpine Integration:**
+
+```javascript
+// Alpine v3 integration
+hyva.alpineInitialized = (fn) => {
+    window.addEventListener('alpine:initialized', fn, {once: true})
+}
+
+// Empty component registration
+window.addEventListener('alpine:init', () => {
+    Alpine.data('{}', () => ({}))
+}, {once: true});
+```
+
+**Usage in Templates:**
+
 ```html
-<div x-data="{ baseUrl: window.hyva.config.baseUrl }">
-    <a :href="baseUrl + '/checkout'">Checkout</a>
+<div x-data="{
+    price: 29.99,
+    formatted: hyva.formatPrice(29.99)
+}">
+    Price: <span x-text="formatted"></span>
 </div>
+
+<script>
+    hyva.alpineInitialized(() => {
+        console.log('Alpine is ready!');
+    });
+</script>
 ```
 
 ---
 
-### Step 6: Adding Custom Alpine.js Plugin
+### Step 6: Event Timeline
+
+```
+Page Load Start
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ HEAD SECTION                                            │
+├─────────────────────────────────────────────────────────┤
+│ • Global variables defined (BASE_URL, COOKIE_CONFIG)    │
+│ • hyva.* utility functions created                      │
+│ • hyva.alpineInitialized() registered                   │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ BODY CONTENT RENDERS                                    │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ BEFORE BODY END - Plugin Scripts Execute               │
+├─────────────────────────────────────────────────────────┤
+│ • Snap Slider: Registers 'alpine:init' listener         │
+│ • HTML Dialog: Registers 'alpine:init' listener         │
+│ • Intersect: Registers 'alpine:init' listener           │
+│ • Defer: Registers 'alpine:init' listener               │
+│ • Ignore: Registers 'alpine:init' listener              │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Alpine.js Core Loads (alpine3.min.js)                   │
+└─────────────────────────────────────────────────────────┘
+    ↓
+EVENT: 'alpine:init' dispatched ✨
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Plugins Attach to Alpine                                │
+├─────────────────────────────────────────────────────────┤
+│ • Alpine.plugin(snapSlider)                             │
+│ • Alpine.plugin(htmlDialog)                             │
+│ • Alpine.directive('intersect', ...)                    │
+│ • initDeferredComponents() runs                         │
+│   - Scans for [x-defer] components                      │
+│   - Marks them with x-ignore                            │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Alpine Scans DOM                                        │
+├─────────────────────────────────────────────────────────┤
+│ • Finds [x-data] components                             │
+│ • Skips [x-ignore] (deferred) components                │
+│ • Initializes reactive data                             │
+│ • Binds event listeners                                 │
+└─────────────────────────────────────────────────────────┘
+    ↓
+EVENT: 'alpine:initialized' dispatched ✨
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ Callbacks Execute                                       │
+├─────────────────────────────────────────────────────────┤
+│ • hyva.alpineInitialized() callbacks fire               │
+│ • Deferred components wait for triggers                 │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ PAGE FULLY INTERACTIVE                                  │
+└─────────────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────────────┐
+│ USER INTERACTIONS / VIEWPORT CHANGES                    │
+├─────────────────────────────────────────────────────────┤
+│ User scrolls → Deferred component enters viewport       │
+│              → Alpine.initTree(el) called               │
+│              → Component becomes active                 │
+│                                                          │
+│ User clicks → x-defer="interact" components load        │
+│             → Alpine.initTree(el) called                │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Step 7: Complete File Reference
+
+| Purpose | File Location | Lines |
+|---------|---------------|-------|
+| **Entry Point** | `magento2-default-theme/Magento_Theme/layout/default.xml` | 10 |
+| **Alpine Setup** | `magento2-theme-module/src/view/frontend/layout/default_hyva.xml` | 28-54 |
+| **Alpine Loader** | `magento2-theme-module/src/view/base/templates/page/js/alpinejs.phtml` | 32-36 |
+| **Alpine Core** | `magento2-theme-module/src/view/base/web/js/alpine3.min.js` | - |
+| **Global Variables** | `magento2-theme-module/src/view/frontend/templates/page/js/variables.phtml` | 38-70 |
+| **Hyva Utilities** | `magento2-theme-module/src/view/frontend/templates/page/js/hyva.phtml` | 484-494 |
+| **Intersect Plugin** | `magento2-theme-module/src/view/base/templates/page/js/plugins/v3/intersect.phtml` | 14-73 |
+| **Defer Plugin** | `magento2-theme-module/src/view/base/templates/page/js/plugins/v3/defer.phtml` | 59-87 |
+| **HTMLDialog Plugin** | `magento2-theme-module/src/view/base/templates/page/js/plugins/v3/htmldialog.phtml` | - |
+| **Snap Slider Plugin** | `magento2-theme-module/src/view/base/templates/page/js/plugins/v3/snap-slider.phtml` | - |
+
+---
+
+### Step 8: Adding Custom Alpine.js Plugin
 
 **Step-by-Step:**
 
@@ -989,21 +1474,36 @@ vendor/hyva-themes/magento2-theme-module/src/
 **File:** `app/design/frontend/MyCompany/hyva-custom/Magento_Theme/templates/page/js/custom-alpine-plugin.phtml`
 
 ```php
+<?php
+/**
+ * Custom Alpine.js Plugin Example
+ */
+use Hyva\Theme\ViewModel\HyvaCsp;
+
+/** @var HyvaCsp $hyvaCsp */
+?>
 <script>
 document.addEventListener('alpine:init', () => {
     // Custom Alpine.js Magic Property
-    Alpine.magic('customHelper', () => {
-        return (value) => {
-            return value.toUpperCase();
-        };
+    Alpine.magic('uppercase', () => {
+        return (value) => String(value).toUpperCase();
     });
 
     // Custom Alpine.js Directive
     Alpine.directive('highlight', (el, { expression }, { evaluate }) => {
-        el.classList.add('bg-yellow-200');
+        const color = evaluate(expression) || 'yellow';
+        el.style.backgroundColor = color;
     });
+
+    // Custom Alpine.js Data Component
+    Alpine.data('customCounter', (start = 0) => ({
+        count: start,
+        increment() { this.count++ },
+        decrement() { this.count-- }
+    }));
 });
 </script>
+<?php $hyvaCsp->registerInlineScript() ?>
 ```
 
 #### 2. Add to Layout XML
@@ -1012,13 +1512,14 @@ document.addEventListener('alpine:init', () => {
 
 ```xml
 <?xml version="1.0"?>
-<page>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <body>
-        <referenceBlock name="script-alpine-js">
+        <referenceContainer name="before.body.end">
             <block name="alpine-plugin-custom"
                    template="Magento_Theme::page/js/custom-alpine-plugin.phtml"
-                   before="alpine-plugin-intersect"/>
-        </referenceBlock>
+                   before="script-alpine-js"/>
+            <!-- before="script-alpine-js" ensures plugin loads BEFORE Alpine.js core -->
+        </referenceContainer>
     </body>
 </page>
 ```
@@ -1027,12 +1528,27 @@ document.addEventListener('alpine:init', () => {
 
 ```html
 <!-- Use custom magic property -->
-<div x-data="{ text: 'hello' }">
-    <p x-text="$customHelper(text)"></p> <!-- Outputs: HELLO -->
+<div x-data="{ text: 'hello world' }">
+    <p x-text="$uppercase(text)"></p>  <!-- Outputs: HELLO WORLD -->
 </div>
 
 <!-- Use custom directive -->
-<div x-highlight>This will be highlighted</div>
+<div x-highlight="'lightblue'">This will be highlighted</div>
+
+<!-- Use custom data component -->
+<div x-data="customCounter(10)">
+    <button @click="decrement">-</button>
+    <span x-text="count"></span>
+    <button @click="increment">+</button>
+</div>
+```
+
+#### 4. Clear Cache and Deploy
+
+```bash
+php bin/magento cache:clean layout
+php bin/magento cache:clean full_page
+php bin/magento setup:static-content:deploy -f
 ```
 
 ---
