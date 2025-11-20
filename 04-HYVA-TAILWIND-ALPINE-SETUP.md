@@ -1,6 +1,6 @@
 # Complete Tailwind CSS & Alpine.js Setup Guide for Hyvä Themes
 
-**Comprehensive guide for understanding how Tailwind CSS and Alpine.js are configured in Hyvä**
+**Comprehensive guide for understanding how Tailwind CSS and Alpine.js are configured in Hyvä v1.4.1**
 
 ---
 
@@ -19,7 +19,11 @@
 
 ### Overview
 
-Hyvä uses **Tailwind CSS v3** with **JIT (Just-In-Time)** compiler for optimal performance. Tailwind is configured to scan all theme templates and generate only the CSS classes that are actually used.
+Hyvä v1.4.1 uses **Tailwind CSS v4.1.15** (latest) with modern CSS-first configuration. Tailwind v4 introduces a new approach:
+- **@import "tailwindcss"** directive instead of JS config
+- **@source** directive to define content paths
+- **@theme** directive for design tokens
+- No separate `tailwind.config.js` needed (uses `hyva.config.json` for tokens)
 
 ---
 
@@ -28,239 +32,599 @@ Hyvä uses **Tailwind CSS v3** with **JIT (Just-In-Time)** compiler for optimal 
 ```
 vendor/hyva-themes/magento2-default-theme/
 └── web/
+    ├── css/
+    │   └── styles.css                 # Final compiled CSS (~96KB minified)
     └── tailwind/
-        ├── tailwind.config.js         # Main Tailwind configuration
-        ├── tailwind-source.css        # Source CSS (imports)
-        ├── tailwind.css               # Compiled output (generated)
-        ├── package.json               # NPM dependencies
-        ├── package-lock.json          # Lock file
-        └── components/
-            └── custom-components.css  # Custom component definitions
+        ├── tailwind-source.css        # Main entry point (Tailwind v4 syntax)
+        ├── hyva.config.json           # Design tokens & configuration
+        ├── package.json               # NPM dependencies (@tailwindcss/cli ^4.1.12)
+        ├── base/
+        │   ├── index.css              # Base layer entry
+        │   ├── preflight.css          # Tailwind CSS reset
+        │   └── print.css              # Print styles
+        ├── components/
+        │   └── index.css              # Component styles
+        ├── theme/
+        │   ├── index.css              # Theme layer entry
+        │   ├── form.css               # Form styling
+        │   ├── product-price.css      # Product prices
+        │   ├── page-cms.css           # CMS pages
+        │   └── ...more theme files
+        ├── utilities/
+        │   └── index.css              # Custom utilities
+        └── generated/
+            ├── hyva-source.css        # Auto-generated from Hyva modules
+            └── hyva-tokens.css        # Auto-generated design tokens
 
 Your custom theme (app/design/frontend/MyCompany/hyva-custom/):
 └── web/
     └── tailwind/
-        ├── tailwind.config.js         # Your custom configuration
-        ├── tailwind-source.css        # Optional custom source
-        └── components/
-            └── custom-components.css  # Your custom components
+        ├── tailwind-source.css        # Your custom source
+        ├── hyva.config.json           # Your custom tokens
+        ├── package.json
+        └── (copy entire structure from default theme)
 ```
 
 ---
 
-### Step 1: Understanding tailwind.config.js
+### Step 1: Understanding tailwind-source.css (Tailwind v4 Entry Point)
 
-**Location:** `vendor/hyva-themes/magento2-default-theme/web/tailwind/tailwind.config.js`
+**Location:** `vendor/hyva-themes/magento2-default-theme/web/tailwind/tailwind-source.css`
 
-**Purpose:** Main configuration file that defines:
-- Content paths to scan for class names
-- Theme colors, fonts, spacing
-- Plugins
-- Custom utilities
+**Purpose:** Main entry point for Tailwind v4 compilation. This file uses the new Tailwind v4 syntax.
 
-**Key Sections:**
-
-```javascript
-module.exports = {
-    // 1. PRESETS - Import Hyvä's base configuration
-    presets: [
-        hyvaModules.getThemeConfig()
-    ],
-
-    // 2. CONTENT - Files to scan for Tailwind classes
-    content: [
-        // Hyvä default theme templates
-        '../../../../../../../vendor/hyva-themes/magento2-default-theme/**/*.phtml',
-        '../../../../../../../vendor/hyva-themes/magento2-theme-module/src/**/*.phtml',
-
-        // Layout XML files
-        '../../*/layout/*.xml',
-        '../../*/page_layout/*.xml',
-
-        // Custom theme templates
-        '../../**/*.phtml',
-    ],
-
-    // 3. THEME - Extend default theme
-    theme: {
-        extend: {
-            colors: { /* custom colors */ },
-            fontFamily: { /* custom fonts */ },
-            spacing: { /* custom spacing */ },
-            // ... more customizations
-        },
-    },
-
-    // 4. PLUGINS - Additional functionality
-    plugins: [
-        require('@tailwindcss/forms'),
-        require('@tailwindcss/typography'),
-        // Custom plugins
-    ],
-}
-```
-
----
-
-### Step 2: Understanding tailwind-source.css
-
-**Location:** `web/tailwind/tailwind-source.css`
-
-**Purpose:** Entry point for Tailwind compilation. This file imports Tailwind's base styles, components, and utilities.
-
-**Default Content:**
+**Content:**
 
 ```css
 /**
- * Tailwind CSS Source File
- * This file is compiled into tailwind.css
+ * Tailwind CSS v4 Source File
+ * Hyvä Theme v1.4.1
  */
 
-/* Tailwind base styles */
-@tailwind base;
+/* 1. Import Hyva modules CSS */
+@import "@hyva-themes/hyva-modules/css";
 
-/* Tailwind component classes */
-@tailwind components;
+/* 2. Import Tailwind CSS v4 */
+@import "tailwindcss" source(none);
 
-/* Custom components */
-@import './components/custom-components.css';
+/* 3. Define content sources (files to scan for classes) */
+@source "../../**/*.phtml";   /* All template files */
+@source "../../**/*.xml";      /* All XML layout files */
 
-/* Tailwind utility classes */
-@tailwind utilities;
+/* 4. Import custom base styles */
+@import "./base";              /* → ./base/index.css */
 
-/* Custom utilities */
-@layer utilities {
-    .text-shadow {
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-    }
-}
+/* 5. Import components */
+@import "./components";        /* → ./components/index.css */
 
-/* Custom base styles */
-@layer base {
-    h1 {
-        @apply text-3xl font-bold;
-    }
-    h2 {
-        @apply text-2xl font-semibold;
-    }
+/* 6. Import theme-specific styles */
+@import "./theme";             /* → ./theme/index.css */
+
+/* 7. Import utilities */
+@import "./utilities";         /* → ./utilities/index.css */
+
+/* 8. Import generated Hyva module styles */
+@import "./generated/hyva-source.css";
+
+/* 9. Import design tokens */
+@import "./generated/hyva-tokens.css";
+
+/* 10. Define custom design tokens */
+@theme {
+    --color-bg: var(--color-slate-50);
+    --color-fg: var(--color-slate-950);
+    --color-fg-secondary: var(--color-slate-600);
+    --color-surface: var(--color-white);
 }
 ```
 
-**Layers Explained:**
-- `@tailwind base` - CSS reset and base element styles
-- `@tailwind components` - Component classes (buttons, cards, etc.)
-- `@tailwind utilities` - Utility classes (flex, grid, colors, etc.)
-- `@layer` - Define custom styles in specific layers
+**Key Concepts:**
+- `@import "tailwindcss"` - Imports Tailwind v4 core
+- `@source` - Defines which files to scan (replaces `content` in v3 config)
+- `@theme` - Defines design tokens (CSS variables)
+
+---
+
+### Step 2: Understanding hyva.config.json (Design Tokens)
+
+**Location:** `vendor/hyva-themes/magento2-default-theme/web/tailwind/hyva.config.json`
+
+**Purpose:** Defines design tokens (colors, form styling, etc.) for Tailwind v4. Replaces parts of the old `tailwind.config.js`.
+
+**Content:**
+
+```json
+{
+  "tailwind": {
+    "include": [],  /* Additional Tailwind plugins to include */
+    "exclude": []   /* Tailwind features to exclude */
+  },
+  "tokens": {
+    "values": {
+      "color": {
+        "primary": {
+          "lighter": "oklch(52% 0.2 265)",
+          "DEFAULT": "oklch(46% 0.2 265)",
+          "darker": "oklch(28% 0.2 265)"
+        },
+        "secondary": {
+          "lighter": "oklch(72% 0.2 150)",
+          "DEFAULT": "oklch(53% 0.15 150)",
+          "darker": "oklch(39% 0.1 153)"
+        },
+        "on": {
+          "primary": "#fff",
+          "secondary": "#fff"
+        }
+      },
+      "form": {
+        "radius": "var(--radius-lg)",
+        "stroke": "var(--color-slate-400)",
+        "active-color": "var(--color-primary)"
+      }
+    }
+  }
+}
+```
+
+**Key Features:**
+- **OKLCH colors** - Modern color space for better perceptual uniformity
+- **Design tokens** - Centralized theme values
+- **Form defaults** - Consistent form styling across the theme
 
 ---
 
 ### Step 3: Understanding package.json
 
-**Location:** `web/tailwind/package.json`
+**Location:** `vendor/hyva-themes/magento2-default-theme/web/tailwind/package.json`
 
-**Purpose:** Defines NPM dependencies and build scripts.
+**Purpose:** Defines NPM dependencies and build scripts for Tailwind v4.
 
-**Default Content:**
+**Content:**
 
 ```json
 {
-  "name": "hyva-theme-tailwind",
-  "version": "1.0.0",
-  "description": "Tailwind CSS for Hyvä Theme",
-  "scripts": {
-    "build": "tailwindcss -i tailwind-source.css -o tailwind.css --minify",
-    "watch": "tailwindcss -i tailwind-source.css -o tailwind.css --watch",
-    "build:dev": "tailwindcss -i tailwind-source.css -o tailwind.css"
-  },
+  "name": "@hyva-themes/magento2-default-theme",
+  "version": "3.0.0",
+  "type": "module",
   "dependencies": {
-    "@hyva-themes/hyva-modules": "^1.0.0",
-    "@tailwindcss/forms": "^0.5.3",
-    "@tailwindcss/typography": "^0.5.9",
-    "tailwindcss": "^3.3.0"
+    "@hyva-themes/hyva-modules": "^1.2.2",
+    "@tailwindcss/cli": "^4.1.12",
+    "tailwindcss": "^4.1.15"
+  },
+  "scripts": {
+    "start": "npm run watch",
+    "generate": "npx hyva-sources && npx hyva-tokens",
+    "prewatch": "npm run generate",
+    "watch": "npx tailwindcss -i tailwind-source.css -o ../css/styles.css --watch",
+    "prebuild": "npm run generate",
+    "build": "npx tailwindcss -i tailwind-source.css -o ../css/styles.css --minify"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
 ```
 
 **Scripts Explained:**
-- `build` - Compile for production (minified)
-- `watch` - Watch for changes and recompile automatically
-- `build:dev` - Compile for development (unminified, with source maps)
+- `npm run generate` - Generates `hyva-source.css` and `hyva-tokens.css`
+- `npm run watch` - Development mode (auto-rebuild on changes)
+- `npm run build` - Production build (minified output)
+
+**Important:**
+- Requires Node.js >= 20.0.0
+- Uses Tailwind CSS v4.1.15 (not v3)
+- Outputs to `../css/styles.css` (not `tailwind.css`)
 
 ---
 
-### Step 4: Tailwind Compilation Process
+### Step 4: Complete Tailwind CSS Flow (Request to Browser)
 
-**How Tailwind CSS is compiled in Hyvä:**
+**This section explains how Tailwind CSS works in Hyvä from a browser request to final CSS rendering.**
+
+---
+
+#### 🔄 Complete Sequence: How Tailwind CSS Works
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Scan Content Files (from tailwind.config.js)            │
-│    - *.phtml templates                                      │
-│    - *.xml layout files                                     │
-│    - *.js JavaScript files                                  │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Extract Tailwind Classes                                 │
-│    - Find all class="..." attributes                        │
-│    - Extract class names (e.g., "bg-blue-500", "p-4")      │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Generate CSS                                             │
-│    - Create CSS rules for extracted classes                 │
-│    - Apply theme configuration (colors, fonts, etc.)        │
-│    - Add custom components and utilities                    │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Optimize (JIT Compiler)                                  │
-│    - Remove unused CSS (purge)                              │
-│    - Minify output                                          │
-│    - Generate source map (if dev mode)                      │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 5. Output: tailwind.css                                     │
-│    - Final compiled CSS file                                │
-│    - Served to browser                                      │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ USER BROWSER → SERVER REQUEST                                    │
+└──────────────────────────────────────────────────────────────────┘
+
+STEP 1: User visits page
+        └─→ Browser requests: http://yoursite.com/
+
+STEP 2: Magento processes layout XML
+        └─→ File: vendor/hyva-themes/magento2-default-theme/
+                  Magento_Theme/layout/default.xml
+            <page>
+                <update handle="default_hyva"/>  ← Loads Hyvä setup
+            </page>
+
+STEP 3: Load Hyvä default layout
+        └─→ File: vendor/hyva-themes/magento2-theme-module/
+                  src/view/frontend/layout/default_hyva.xml
+            - Loads Alpine.js and JavaScript components
+
+STEP 4: Load CSS in <head>
+        └─→ File: vendor/hyva-themes/magento2-default-theme/
+                  Magento_Theme/layout/default_head_blocks.xml
+            <head>
+                <css src="css/styles.css"/>  ← THIS LOADS TAILWIND!
+            </head>
+
+STEP 5: Magento resolves CSS path
+        └─→ Theme fallback system searches:
+            1. app/design/frontend/[YourVendor]/[YourTheme]/web/css/styles.css
+            2. vendor/hyva-themes/magento2-default-theme/web/css/styles.css ✓
+            ✓ Found!
+
+STEP 6: Static content deployment (after bin/magento setup:static-content:deploy)
+        └─→ Copies to: pub/static/frontend/Hyva/default/en_US/css/styles.css
+            File size: ~96 KB (minified)
+
+STEP 7: Browser loads CSS
+        └─→ URL: https://yoursite.com/static/version123/frontend/Hyva/default/en_US/css/styles.css
+            Browser parses and applies styles
+
+
+┌──────────────────────────────────────────────────────────────────┐
+│ BUILD PROCESS - How styles.css Was Created                      │
+└──────────────────────────────────────────────────────────────────┘
+
+STEP 8: Entry point - tailwind-source.css
+        └─→ File: vendor/hyva-themes/magento2-default-theme/
+                  web/tailwind/tailwind-source.css
+
+            /* Import Hyva modules CSS */
+            @import "@hyva-themes/hyva-modules/css";
+
+            /* Import Tailwind CSS v4 */
+            @import "tailwindcss" source(none);
+
+            /* Define content sources */
+            @source "../../**/*.phtml";   ← Scan all templates
+            @source "../../**/*.xml";      ← Scan all layouts
+
+            /* Import layers */
+            @import "./base";              ← Base styles
+            @import "./components";        ← Components
+            @import "./theme";             ← Theme styles
+            @import "./utilities";         ← Utilities
+            @import "./generated/hyva-source.css";   ← Auto-generated
+            @import "./generated/hyva-tokens.css";   ← Design tokens
+
+STEP 9: Import base layer
+        └─→ File: web/tailwind/base/index.css
+            @import "./preflight.css";  ← Tailwind CSS reset
+            @import "./print.css";      ← Print styles
+
+            @layer base {
+                :root { scrollbar-color: var(--color-primary); }
+                body { background: var(--color-bg); }
+            }
+
+            [x-cloak] { display: none !important; }  ← Alpine.js
+
+STEP 10: Import theme layer
+         └─→ File: web/tailwind/theme/index.css
+             @import "./form.css";              ← Form elements
+             @import "./product-price.css";     ← Product prices
+             @import "./page-cms.css";          ← CMS pages
+             @import "./page-catalog.css";      ← Catalog pages
+             (+ more theme files)
+
+STEP 11: Read design tokens
+         └─→ File: web/tailwind/hyva.config.json
+             {
+               "tokens": {
+                 "values": {
+                   "color": {
+                     "primary": { "DEFAULT": "oklch(46% 0.2 265)" },
+                     "secondary": { "DEFAULT": "oklch(53% 0.15 150)" }
+                   }
+                 }
+               }
+             }
+
+STEP 12: NPM build scripts
+         └─→ File: web/tailwind/package.json
+             {
+               "scripts": {
+                 "generate": "npx hyva-sources && npx hyva-tokens",
+                 "watch": "npx tailwindcss -i tailwind-source.css -o ../css/styles.css --watch",
+                 "build": "npx tailwindcss -i tailwind-source.css -o ../css/styles.css --minify"
+               }
+             }
+
+STEP 13: Build process runs
+         └─→ Command: npm run build
+             ├─→ npx hyva-sources
+             │   └─→ Generates: generated/hyva-source.css
+             │       (Hyva-compatible modules CSS)
+             │
+             ├─→ npx hyva-tokens
+             │   └─→ Generates: generated/hyva-tokens.css
+             │       :root {
+             │         --color-primary: oklch(46% 0.2 265);
+             │         --color-secondary: oklch(53% 0.15 150);
+             │       }
+             │
+             └─→ npx tailwindcss -i tailwind-source.css -o ../css/styles.css --minify
+                 Input:  tailwind-source.css
+                 Output: ../css/styles.css (96KB minified)
+
+STEP 14: Generated files created
+         ├─→ generated/hyva-source.css   (Auto-generated module CSS)
+         └─→ generated/hyva-tokens.css   (Auto-generated design tokens)
+
+STEP 15: Final output - styles.css
+         └─→ File: vendor/hyva-themes/magento2-default-theme/web/css/styles.css
+             /*! tailwindcss v4.1.12 | MIT License */
+             /* Single-line minified CSS containing:
+                - Tailwind CSS reset (Preflight)
+                - CSS custom properties (design tokens)
+                - Base styles
+                - Component classes
+                - Utility classes
+                - Theme customizations
+             */
+
+STEP 16: Tailwind scans for classes
+         └─→ Scans paths defined by @source directives:
+             ../../**/*.phtml  ← All template files
+             ../../**/*.xml    ← All layout files
+
+             Example files scanned:
+             - Magento_Catalog/templates/product/list.phtml
+             - Magento_Catalog/layout/catalog_product_view.xml
+             - Magento_Theme/templates/html/header.phtml
+
+             Finds classes like:
+             <div class="flex items-center gap-4 px-6 py-4">
+                          ↓
+             Generates corresponding CSS utilities in styles.css
+
+STEP 17: Browser loads and applies CSS
+         └─→ Browser receives CSS file
+             ├─→ Parses CSS rules
+             ├─→ Builds CSSOM (CSS Object Model)
+             ├─→ Combines with DOM
+             └─→ Renders styled page
+```
+
+---
+
+#### 📊 Visual Flow Diagram
+
+```
+                    ┌─────────────────┐
+                    │  User Request   │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │ Magento Layout  │
+                    │  Processing     │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │  default.xml    │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │ default_hyva.xml│
+                    │  (Alpine.js)    │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │default_head_    │
+                    │blocks.xml       │
+                    │<css src="css/   │
+                    │styles.css"/>    │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │ Resolve Path    │
+                    │ vendor/hyva-    │
+                    │ themes/.../web/ │
+                    │ css/styles.css  │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │ Static Deploy   │
+                    │ Copy to pub/    │
+                    │ static/         │
+                    └────────┬────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │ Browser Loads   │
+                    │  styles.css     │
+                    └─────────────────┘
+
+╔═══════════════════════════════════════════════════════════╗
+║  HOW styles.css WAS BUILT (Build Process)                ║
+╚═══════════════════════════════════════════════════════════╝
+
+        ┌──────────────────────────┐
+        │ tailwind-source.css      │
+        │  @import "tailwindcss"   │
+        │  @source ".../*.phtml"   │
+        └────────────┬─────────────┘
+                     ↓
+        ┌──────────────────────────┐
+        │ Import Layers            │
+        ├─→ base/index.css         │
+        ├─→ components/index.css   │
+        ├─→ theme/index.css        │
+        ├─→ utilities/index.css    │
+        └────────────┬─────────────┘
+                     ↓
+        ┌──────────────────────────┐
+        │ Read hyva.config.json    │
+        │  - Design tokens         │
+        │  - Color palette         │
+        │  - Form defaults         │
+        └────────────┬─────────────┘
+                     ↓
+        ┌──────────────────────────┐
+        │ npm run build            │
+        ├─→ npx hyva-sources       │
+        ├─→ npx hyva-tokens        │
+        └─→ npx tailwindcss        │
+             └────────┬─────────────┘
+                      ↓
+        ┌──────────────────────────┐
+        │ Generate Files           │
+        ├─→ hyva-source.css        │
+        └─→ hyva-tokens.css        │
+             └────────┬─────────────┘
+                      ↓
+        ┌──────────────────────────┐
+        │ Compile & Minify         │
+        │  - Scan templates        │
+        │  - Extract classes       │
+        │  - Generate CSS          │
+        │  - Minify output         │
+        └────────────┬─────────────┘
+                     ↓
+        ┌──────────────────────────┐
+        │ Output: ../css/styles.css│
+        │  Size: ~96KB             │
+        └──────────────────────────┘
+```
+
+---
+
+#### 🗂️ Complete File Tree
+
+```
+/var/www/html/m247/
+│
+├── vendor/hyva-themes/magento2-default-theme/
+│   │
+│   ├── Magento_Theme/
+│   │   └── layout/
+│   │       ├── default.xml                     [STEP 2] ← Main layout
+│   │       └── default_head_blocks.xml         [STEP 4] ← Loads CSS
+│   │
+│   ├── web/
+│   │   ├── css/
+│   │   │   └── styles.css                      [STEP 15] ← Final CSS (96KB)
+│   │   │
+│   │   └── tailwind/
+│   │       ├── tailwind-source.css             [STEP 8] ← Entry point
+│   │       ├── hyva.config.json                [STEP 11] ← Design tokens
+│   │       ├── package.json                    [STEP 12] ← Build scripts
+│   │       │
+│   │       ├── base/
+│   │       │   ├── index.css                   [STEP 9] ← Base layer
+│   │       │   ├── preflight.css               ← CSS reset
+│   │       │   └── print.css                   ← Print styles
+│   │       │
+│   │       ├── theme/
+│   │       │   ├── index.css                   [STEP 10] ← Theme layer
+│   │       │   ├── form.css
+│   │       │   ├── product-price.css
+│   │       │   ├── page-cms.css
+│   │       │   └── ...
+│   │       │
+│   │       ├── components/
+│   │       │   └── index.css
+│   │       │
+│   │       ├── utilities/
+│   │       │   └── index.css
+│   │       │
+│   │       └── generated/
+│   │           ├── hyva-source.css             [STEP 14] ← Auto-generated
+│   │           └── hyva-tokens.css             [STEP 14] ← Tokens
+│   │
+│   └── etc/
+│       ├── view.xml
+│       └── hyva-libraries.json                 ← Alpine v3 config
+│
+├── vendor/hyva-themes/magento2-theme-module/
+│   └── src/view/frontend/layout/
+│       └── default_hyva.xml                    [STEP 3] ← Hyvä layout
+│
+└── pub/static/frontend/Hyva/default/en_US/
+    └── css/
+        └── styles.css                          [STEP 6] ← Deployed CSS
+```
+
+---
+
+#### ⚡ Quick Reference: Build Workflow
+
+```bash
+# DEVELOPMENT MODE
+cd vendor/hyva-themes/magento2-default-theme/web/tailwind/
+npm install                    # Install dependencies (Node >= 20)
+npm run watch                  # Watch mode (auto-rebuild)
+  ↓
+  ├─→ Generates: generated/hyva-source.css
+  ├─→ Generates: generated/hyva-tokens.css
+  └─→ Compiles: tailwind-source.css → ../css/styles.css
+
+# PRODUCTION MODE
+npm run build                  # Production build (minified)
+  ↓
+  └─→ Output: ../css/styles.css (96KB)
+
+# MAGENTO DEPLOYMENT
+cd /var/www/html/m247
+bin/magento setup:static-content:deploy -f
+  ↓
+  └─→ Copies: web/css/styles.css → pub/static/.../css/styles.css
+
+bin/magento cache:clean
+  ↓
+  └─→ Browser loads fresh CSS
 ```
 
 ---
 
 ### Step 5: How Tailwind CSS is Loaded in Browser
 
-**File:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/layout/default_hyva.xml`
+**Layout XML:** `vendor/hyva-themes/magento2-default-theme/Magento_Theme/layout/default_head_blocks.xml`
 
 ```xml
-<referenceContainer name="head.additional">
-    <block name="head.hyva-scripts" template="Hyva_Theme::page/js/hyva.phtml"/>
-</referenceContainer>
+<?xml version="1.0"?>
+<page>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <css src="css/styles.css"/>  <!-- ← Loads compiled Tailwind CSS -->
+    </head>
+</page>
 ```
 
-**Template:** `vendor/hyva-themes/magento2-theme-module/src/view/frontend/templates/page/js/hyva.phtml`
+**Main Layout:** `vendor/hyva-themes/magento2-default-theme/Magento_Theme/layout/default.xml`
 
-This template includes the compiled `tailwind.css` file:
-
-```php
-<link rel="stylesheet" href="<?= $escaper->escapeUrl($block->getViewFileUrl('css/tailwind.css')) ?>" />
+```xml
+<?xml version="1.0"?>
+<page>
+    <update handle="default_hyva"/>  <!-- Loads Hyvä-specific setup -->
+    <body>
+        <!-- Page structure blocks -->
+    </body>
+</page>
 ```
 
 **Complete Flow:**
 
 ```
-Layout XML (default_hyva.xml)
-    ↓
-Block (Hyva_Theme::page/js/hyva.phtml)
-    ↓
-Loads: pub/static/.../Hyva_Theme/css/tailwind.css
-    ↓
-Browser applies styles
+1. Magento processes layout XML
+   ↓
+2. default.xml includes default_hyva.xml
+   ↓
+3. default_head_blocks.xml adds <css src="css/styles.css"/>
+   ↓
+4. Magento resolves path:
+   vendor/hyva-themes/magento2-default-theme/web/css/styles.css
+   ↓
+5. Static deployment copies to:
+   pub/static/frontend/Hyva/default/en_US/css/styles.css
+   ↓
+6. Browser loads CSS
 ```
 
 ---
@@ -273,14 +637,15 @@ Browser applies styles
 # 1. Navigate to Tailwind directory
 cd vendor/hyva-themes/magento2-default-theme/web/tailwind/
 
-# 2. Install NPM dependencies (first time only)
+# 2. Install NPM dependencies (first time only - requires Node.js >= 20.0.0)
 npm install
 
-# 3. Build Tailwind CSS for development
-npm run build:dev
-
-# 4. Watch mode (auto-rebuild on changes)
+# 3. Watch mode (auto-rebuild on changes)
 npm run watch
+# This runs:
+# - npx hyva-sources (generates generated/hyva-source.css)
+# - npx hyva-tokens (generates generated/hyva-tokens.css)
+# - npx tailwindcss -i tailwind-source.css -o ../css/styles.css --watch
 ```
 
 #### For Production:
@@ -288,23 +653,32 @@ npm run watch
 ```bash
 # Build minified CSS for production
 npm run build
+# This runs:
+# - npx hyva-sources
+# - npx hyva-tokens
+# - npx tailwindcss -i tailwind-source.css -o ../css/styles.css --minify
 ```
 
 #### For Custom Theme:
 
 ```bash
-# 1. Navigate to your theme's Tailwind directory
+# 1. Copy Tailwind setup to your theme
+cp -r vendor/hyva-themes/magento2-default-theme/web/tailwind \
+      app/design/frontend/MyCompany/hyva-custom/web/
+
+# 2. Navigate to your theme's Tailwind directory
 cd app/design/frontend/MyCompany/hyva-custom/web/tailwind/
 
-# 2. Install dependencies
+# 3. Install dependencies
 npm install
 
-# 3. Build
+# 4. Build
 npm run build
 
-# 4. Deploy to Magento static files
-cd /var/www/html/m246p8
+# 5. Deploy to Magento static files
+cd /var/www/html/m247
 php bin/magento setup:static-content:deploy -f
+php bin/magento cache:clean
 ```
 
 ---
@@ -312,15 +686,22 @@ php bin/magento setup:static-content:deploy -f
 ### Step 7: Where Compiled CSS is Stored
 
 **After Compilation:**
-- `web/tailwind/tailwind.css` - Compiled CSS in theme directory
+- `vendor/hyva-themes/magento2-default-theme/web/css/styles.css` - Final compiled CSS (~96KB minified)
 
 **After Magento Static Content Deploy:**
-- `pub/static/frontend/Hyva/default/en_US/css/tailwind.css`
-- `pub/static/frontend/MyCompany/hyva-custom/en_US/css/tailwind.css`
+- `pub/static/frontend/Hyva/default/en_US/css/styles.css`
+- `pub/static/frontend/MyCompany/hyva-custom/en_US/css/styles.css`
 
 **Browser loads from:**
 ```
-https://yourstore.com/static/version123/frontend/Hyva/default/en_US/css/tailwind.css
+https://yourstore.com/static/version123456789/frontend/Hyva/default/en_US/css/styles.css
+```
+
+**File Contents:**
+```css
+/*! tailwindcss v4.1.12 | MIT License | https://tailwindcss.com */
+@layer properties{...}
+/* Single-line minified CSS containing all utilities */
 ```
 
 ---
@@ -1076,7 +1457,76 @@ tail -f var/log/system.log                       # Watch logs
 
 ---
 
+## 🆕 What's New in Hyvä v1.4.1
+
+### Tailwind CSS v4 Changes
+
+| Aspect | Tailwind v3 (Old) | Tailwind v4 (Hyvä v1.4.1) |
+|--------|------------------|---------------------------|
+| **Config File** | `tailwind.config.js` (JavaScript) | `hyva.config.json` (JSON) + `tailwind-source.css` |
+| **Content Scanning** | `content: [...]` in config | `@source ".../*.phtml"` in CSS |
+| **Import Syntax** | `@tailwind base/components/utilities` | `@import "tailwindcss"` |
+| **Design Tokens** | `theme.extend` in config | `@theme { ... }` in CSS |
+| **Output File** | `tailwind.css` | `../css/styles.css` |
+| **Version** | ^3.3.0 | ^4.1.15 |
+| **CLI** | `tailwindcss` | `@tailwindcss/cli` |
+| **Node Required** | >= 14.0.0 | >= 20.0.0 |
+
+### Key File Locations (Hyvä v1.4.1)
+
+```
+vendor/hyva-themes/magento2-default-theme/
+├── web/
+│   ├── css/
+│   │   └── styles.css                    # ← Final output (not tailwind.css!)
+│   └── tailwind/
+│       ├── tailwind-source.css           # ← Entry point (not tailwind.config.js!)
+│       ├── hyva.config.json              # ← Design tokens (JSON, not JS!)
+│       ├── package.json                  # ← Build scripts
+│       ├── base/, components/, theme/, utilities/
+│       └── generated/
+│           ├── hyva-source.css           # ← Auto-generated
+│           └── hyva-tokens.css           # ← Auto-generated
+└── Magento_Theme/layout/
+    └── default_head_blocks.xml           # ← Loads css/styles.css
+```
+
+### Migration Notes (v3 → v4)
+
+If you have a custom theme using Tailwind v3:
+
+1. **Update package.json dependencies:**
+   ```json
+   "@tailwindcss/cli": "^4.1.12",
+   "tailwindcss": "^4.1.15"
+   ```
+
+2. **Migrate tailwind.config.js → tailwind-source.css:**
+   - Move `content` paths to `@source` directives
+   - Move `theme.extend` to `@theme` blocks
+
+3. **Update build scripts:**
+   ```bash
+   # Old
+   npm run build  # → tailwind.css
+
+   # New
+   npm run build  # → ../css/styles.css
+   ```
+
+4. **Update layout XML:**
+   ```xml
+   <!-- Old -->
+   <css src="css/tailwind.css"/>
+
+   <!-- New -->
+   <css src="css/styles.css"/>
+   ```
+
+---
+
 **Documentation:**
-- Tailwind CSS: https://tailwindcss.com/docs
+- Tailwind CSS v4: https://tailwindcss.com/docs
 - Alpine.js: https://alpinejs.dev
 - Hyvä Docs: https://docs.hyva.io
+- Hyvä v1.4.1 Changelog: https://gitlab.hyva.io/hyva-themes/magento2-default-theme/-/blob/1.4.1/CHANGELOG.md
