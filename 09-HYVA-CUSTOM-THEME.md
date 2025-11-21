@@ -12,6 +12,9 @@
 - Composer 2.x
 
 ```bash
+# Navigate to Magento root
+cd /var/www/html/m247
+
 # Verify installation
 php bin/magento theme:list | grep Hyva
 node --version  # v20.x.x or higher
@@ -24,6 +27,7 @@ node --version  # v20.x.x or higher
 ### Step 1: Create Theme Directory
 
 ```bash
+cd /var/www/html/m247
 mkdir -p app/design/frontend/Logicrays/hyva-child
 cd app/design/frontend/Logicrays/hyva-child
 ```
@@ -79,6 +83,7 @@ ComponentRegistrar::register(
 ### Step 5: Copy Web Directory from Parent
 
 ```bash
+cd /var/www/html/m247
 cp -r vendor/hyva-themes/magento2-default-theme/web/ \
       app/design/frontend/Logicrays/hyva-child/web/
 ```
@@ -121,9 +126,11 @@ Add the `include` directive to reference parent theme templates:
 ### Step 7: Build and Register
 
 ```bash
-cd app/design/frontend/Logicrays/hyva-child/web/tailwind
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
 npm install
 npm run build
+
+cd /var/www/html/m247
 bin/magento cache:flush
 ```
 
@@ -188,7 +195,7 @@ Customize colors in `web/tailwind/hyva.config.json`:
 ### Build Commands
 
 ```bash
-cd web/tailwind
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
 
 npm run watch   # Development (auto-rebuild)
 npm run build   # Production (minified)
@@ -203,17 +210,21 @@ npm run build   # Production (minified)
 Copy templates from parent theme, then customize:
 
 ```bash
+# Navigate to Magento root
+cd /var/www/html/m247
+
 # 1. Find template in parent theme
 ls vendor/hyva-themes/magento2-default-theme/Magento_Catalog/templates/product/
 
 # 2. Create directory structure in child theme
-mkdir -p Magento_Catalog/templates/product/list
+mkdir -p app/design/frontend/Logicrays/hyva-child/Magento_Catalog/templates/product/list
 
-# 3. Copy template
+# 3. Copy template to child theme
 cp vendor/hyva-themes/magento2-default-theme/Magento_Catalog/templates/product/list/item.phtml \
-   Magento_Catalog/templates/product/list/item.phtml
+   app/design/frontend/Logicrays/hyva-child/Magento_Catalog/templates/product/list/item.phtml
 
 # 4. Edit your copy
+nano app/design/frontend/Logicrays/hyva-child/Magento_Catalog/templates/product/list/item.phtml
 ```
 
 ### Common Templates to Override
@@ -374,13 +385,18 @@ $heroicons = $block->getData('heroicons');
 
 ```bash
 # Terminal 1: Watch for CSS changes
-cd web/tailwind && npm run watch
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
+npm run watch
 
 # Terminal 2: After template/layout changes
+cd /var/www/html/m247
 bin/magento cache:clean layout
 
 # Before deployment
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
 npm run build
+
+cd /var/www/html/m247
 bin/magento cache:flush
 ```
 
@@ -415,7 +431,10 @@ Then: `npm run build && bin/magento cache:flush`
 ### CSS Changes Not Appearing
 
 ```bash
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
 npm run build
+
+cd /var/www/html/m247
 bin/magento cache:flush
 # Hard refresh browser: Ctrl+Shift+R
 ```
@@ -423,6 +442,7 @@ bin/magento cache:flush
 ### Theme Not in Admin
 
 ```bash
+cd /var/www/html/m247
 bin/magento setup:upgrade
 bin/magento cache:flush
 bin/magento theme:list
@@ -431,6 +451,7 @@ bin/magento theme:list
 ### Node Errors
 
 ```bash
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
 rm -rf node_modules package-lock.json
 npm install
 node --version  # Must be 20+
@@ -442,9 +463,11 @@ node --version  # Must be 20+
 
 ```bash
 # Build CSS
-cd web/tailwind && npm run build
+cd /var/www/html/m247/app/design/frontend/Logicrays/hyva-child/web/tailwind
+npm run build
 
 # Cache
+cd /var/www/html/m247
 bin/magento cache:clean layout
 bin/magento cache:flush
 
